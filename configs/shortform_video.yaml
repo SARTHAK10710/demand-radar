@@ -1,0 +1,63 @@
+# Demand Radar config — swap this one file to re-target the tool at any product.
+name: shortform_video
+product: "AI tool that turns a rough brief into a finished short-form video"
+
+# Offline demo source: a scrappy, semi-manual seed set of real-shaped demand signals.
+# (Path is resolved relative to this config file.)
+seed_file: ../data/seeds/shortform_video.jsonl
+
+# The pain the product removes — phrases to hunt for in the wild.
+pain_keywords:
+  - "editing takes too long"
+  - "can't afford an editor"
+  - "how do i make a video"
+  - "need someone to edit"
+  - "no time to edit"
+  - "turn a script into a video"
+  - "batch out videos"
+  - "post more consistently"
+  - "repurpose into shorts"
+
+# Where to scan. reddit:* is live-fetchable (best effort); the rest are seed-provided.
+sources:
+  - "reddit:r/NewTubers"
+  - "reddit:r/editors"
+  - "reddit:r/youtubers"
+  - "youtube:comments"
+  - "upwork:video editing"
+
+# Candidate segments to bias clustering toward (the model may still coin others).
+segments_hint:
+  - youtuber
+  - marketer
+  - educator
+  - agency
+  - small business
+
+# Per-segment keywords sharpen the offline heuristic classifier (optional).
+segment_keywords:
+  youtuber: ["youtube", "channel", "subscribers", "creator", "vlog", "gaming channel", "my videos"]
+  marketer: ["marketing", "brand", "ads", "ad creative", "social media manager", "campaign", "saas", "content calendar"]
+  educator: ["course", "teacher", "tutorial", "students", "coaching", "online course", "teach", "lesson"]
+  agency: ["agency", "clients", "client work", "retainer", "we manage", "our clients", "deliverables"]
+  small business: ["small business", "restaurant", "my shop", "local business", "storefront", "ecommerce", "my store", "salon"]
+
+# Naming an incumbent tool is a rough competition signal (warm, but contested).
+competitor_keywords: ["capcut", "premiere", "final cut", "descript", "opus clip", "canva", "davinci", "fiverr editor", "invideo"]
+
+# Optional manual competition estimates per segment (0 = open, 1 = crowded).
+competition_override:
+  youtuber: 0.7
+  marketer: 0.55
+  educator: 0.4
+  agency: 0.45
+  small business: 0.4
+
+# Composite score = volume*w + intent*w + (1-competition)*w  (weights need not sum to 1).
+rank_weights:
+  volume: 0.4
+  intent: 0.4
+  competition: 0.2
+
+lead_count: 10
+model: gemini-2.5-flash

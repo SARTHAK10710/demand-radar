@@ -1,0 +1,62 @@
+# Demand Radar config — a DIFFERENT product, to demo "swap one file, re-target".
+# This one runs on 100% REAL, LIVE data (no seed_file) via open APIs:
+#   Hacker News (Algolia) + Stack Exchange are reachable from anywhere;
+#   Reddit works from a normal residential connection.
+#
+#   python -m demand_radar configs/ai_test_writer.yaml --live-ingest
+#
+name: ai_test_writer
+product: "An AI tool that automatically writes and maintains unit tests for your codebase"
+
+# No seed_file: this config is real-data-only.
+
+pain_keywords:
+  - "writing tests"
+  - "hate writing tests"
+  - "test coverage"
+  - "flaky tests"
+  - "no time to write tests"
+  - "unit testing is tedious"
+  - "untested code"
+  - "increase test coverage"
+
+sources:
+  - "hn:comments"                    # Hacker News (open API, works everywhere)
+  - "stackexchange:stackoverflow"    # Stack Overflow (open API)
+  - "stackexchange:softwareengineering"
+  - "reddit:r/programming"           # works on a residential IP
+  - "reddit:r/ExperiencedDevs"
+
+segments_hint:
+  - indie hacker
+  - startup
+  - enterprise
+  - open source maintainer
+  - data engineer
+
+# Keywords real developers actually use to reveal who they are — sharpen the
+# offline heuristic. (With a Gemini key the LLM infers segment far better.)
+segment_keywords:
+  indie hacker: ["side project", "indie", "solo dev", "solo developer", "my saas", "bootstrap", "side hustle", "hobby project", "weekend project", "one person"]
+  startup: ["startup", "our startup", "seed round", "early stage", "founder", "we're building", "mvp", "small team", "yc "]
+  enterprise: ["enterprise", "large codebase", "legacy code", "our company", "compliance", "big company", "monorepo", "team of", "corporate", "microservices"]
+  open source maintainer: ["open source", "maintainer", "my library", "oss", "contributors", "github repo", "open-source", "my package", "pull request"]
+  data engineer: ["data pipeline", "etl", "data engineer", "machine learning", "ml model", "data science", "notebook", "airflow", "spark"]
+
+competitor_keywords: ["copilot", "codeium", "cursor", "tabnine", "jest", "pytest", "diffblue", "codium", "coverage.py", "junit"]
+
+competition_override:
+  indie hacker: 0.4
+  startup: 0.5
+  enterprise: 0.5
+  open source maintainer: 0.45
+  data engineer: 0.4
+
+rank_weights:
+  volume: 0.4
+  intent: 0.4
+  competition: 0.2
+
+max_posts_per_source: 60
+lead_count: 10
+model: gemini-2.5-flash
