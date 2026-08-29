@@ -1,0 +1,4 @@
+# Core
+google-genai>=1.0        # Google Gemini — the two LLM steps (classify + outreach)
+pyyaml>=6.0              # config loading
+requests>=2.31          # live ingestion (Hacker News, Stack Exchange, Reddit)
