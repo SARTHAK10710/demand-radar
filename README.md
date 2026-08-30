@@ -64,6 +64,7 @@ Each run prints a terminal summary and writes three files to `outputs/`:
 | `--offline` | Force heuristic mode; never call the LLM (no key needed). |
 | `--live` | Force LLM mode even if no key is auto-detected. |
 | `--leads N` | Number of leads to draft outreach for (default from config). |
+| `--max-posts N` | Cap total posts analysed — handy for API rate/quota budgets. |
 | `--model ID` | Override the Gemini model id (e.g. `gemini-flash-latest`). |
 | `--outdir DIR` | Where to write reports (default `outputs/`). |
 | `--quiet` | Suppress step-by-step logging. |

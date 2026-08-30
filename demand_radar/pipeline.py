@@ -44,12 +44,16 @@ def run(
     force_live: bool = False,
     outdir: str = "outputs",
     write: bool = True,
+    max_posts: int | None = None,
     logger: Callable[[str], None] = print,
 ) -> RunResult:
     t0 = time.time()
 
     logger("▸ 1/6 ingest")
     posts = ingest_mod.ingest(config, live=live_ingest, logger=logger)
+    if max_posts and len(posts) > max_posts:
+        posts = posts[:max_posts]
+        logger(f"  [ingest] capped to {max_posts} posts (rate/quota budget)")
 
     llm = LLM(model=config.model, prefer_offline=prefer_offline, force_live=force_live)
     mode = "live" if llm.available else "offline"

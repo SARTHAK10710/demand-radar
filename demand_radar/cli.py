@@ -31,6 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--outdir", default="outputs", help="Where to write reports.")
     p.add_argument("--no-write", action="store_true", help="Don't write report files.")
     p.add_argument("--leads", type=int, default=None, help="Override number of leads.")
+    p.add_argument("--max-posts", type=int, default=None,
+                   help="Cap total posts analysed (useful for API rate/quota budgets).")
     p.add_argument("--model", default=None, help="Override the Claude model id.")
     p.add_argument("--quiet", action="store_true", help="Suppress step-by-step logging.")
     return p
@@ -67,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         force_live=args.live,
         outdir=args.outdir,
         write=not args.no_write,
+        max_posts=args.max_posts,
         logger=logger,
     )
 
