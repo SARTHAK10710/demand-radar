@@ -46,7 +46,7 @@ def _draft_llm(llm: LLM, config: Config, lead: Lead) -> str | None:
         f"- use case: {lead.classified.use_case}\n"
         f'- their words: "{lead.quote}"'
     )
-    return llm.complete_text(system, context, max_tokens=220, effort="low")
+    return llm.complete_text(system, context, max_tokens=1024)
 
 
 def _draft_template(config: Config, lead: Lead) -> str:

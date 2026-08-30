@@ -38,7 +38,8 @@ def _classify_llm(llm: LLM, config: Config, post: Post) -> Optional[ClassifiedPo
         product=config.product,
         segments=", ".join(config.segments_hint) or "(none provided)",
     )
-    data = llm.complete_json(system, f"Post:\n{post.full_text}", max_tokens=300, effort="low")
+    # Gemini 3.x is a thinking model — give it room so reasoning + JSON both fit.
+    data = llm.complete_json(system, f"Post:\n{post.full_text}", max_tokens=1024)
     if not data or "segment" not in data:
         return None
     intent = str(data.get("intent", "browsing")).lower().strip()
@@ -147,7 +148,7 @@ def classify_all(
     config: Config,
     posts: list[Post],
     llm: LLM,
-    max_workers: int = 6,
+    max_workers: int = 3,
     logger: Callable[[str], None] = print,
 ) -> list[ClassifiedPost]:
     """Classify every post, concurrently when using the LLM."""

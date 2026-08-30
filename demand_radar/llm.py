@@ -24,7 +24,7 @@ class LLM:
 
     def __init__(
         self,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.6-flash",
         prefer_offline: bool = False,
         force_live: bool = False,
     ):
@@ -71,45 +71,68 @@ class LLM:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        retries: int = 2,
     ) -> Optional[str]:
-        """One generation. Returns the text, or None on any failure."""
-        try:
-            from google.genai import types
+        """One generation, with 429 backoff. Returns the text, or None on failure."""
+        import time
 
-            config = types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=max_tokens,
-                temperature=temperature,
-                response_mime_type="application/json" if json_mode else "text/plain",
-            )
-            resp = self.client.models.generate_content(
-                model=self.model, contents=user, config=config
-            )
-        except Exception as e:  # never let one bad call kill the pipeline
-            self._last_error = f"{type(e).__name__}: {e}"
-            return None
+        from google.genai import types
 
-        text = getattr(resp, "text", None)
-        if not text:
-            self._last_error = "empty response (possibly safety-blocked or truncated)"
-            return None
-        return text.strip()
+        config = types.GenerateContentConfig(
+            system_instruction=system,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
+            response_mime_type="application/json" if json_mode else "text/plain",
+        )
+        for attempt in range(retries + 1):
+            try:
+                resp = self.client.models.generate_content(
+                    model=self.model, contents=user, config=config
+                )
+            except Exception as e:  # never let one bad call kill the pipeline
+                self._last_error = f"{type(e).__name__}: {e}"
+                if _is_rate_limit(e) and attempt < retries:
+                    time.sleep(_retry_delay(str(e), attempt))
+                    continue
+                return None
+
+            text = getattr(resp, "text", None)
+            if not text:
+                self._last_error = "empty response (possibly safety-blocked or truncated)"
+                return None
+            return text.strip()
+        return None
 
     # -- public helpers -----------------------------------------------------
     def complete_text(
-        self, system: str, user: str, max_tokens: int = 400,
+        self, system: str, user: str, max_tokens: int = 1024,
         temperature: float = 0.7, effort: str | None = None,
     ) -> Optional[str]:
         return self._generate(system, user, max_tokens, temperature, json_mode=False)
 
     def complete_json(
-        self, system: str, user: str, max_tokens: int = 400,
+        self, system: str, user: str, max_tokens: int = 1024,
         temperature: float = 0.0, effort: str | None = None,
     ) -> Optional[dict[str, Any]]:
         raw = self._generate(system, user, max_tokens, temperature, json_mode=True)
         if raw is None:
             return None
         return _extract_json(raw)
+
+
+def _is_rate_limit(e: Exception) -> bool:
+    s = str(e)
+    return "429" in s or "RESOURCE_EXHAUSTED" in s
+
+
+def _retry_delay(message: str, attempt: int) -> float:
+    """Honour the server's retry hint when present, else exponential backoff (<=40s)."""
+    m = re.search(r"retry in (\d+(?:\.\d+)?)s", message) or re.search(
+        r"'retryDelay':\s*'(\d+(?:\.\d+)?)s'", message
+    )
+    if m:
+        return min(float(m.group(1)) + 1.0, 40.0)
+    return min(5.0 * (2 ** attempt), 40.0)
 
 
 def _extract_json(text: str) -> Optional[dict[str, Any]]:
