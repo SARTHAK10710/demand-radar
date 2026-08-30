@@ -43,7 +43,7 @@ class Config:
     rank_weights: RankWeights = field(default_factory=RankWeights)
     max_posts_per_source: int = 150
     lead_count: int = 10                      # how many leads to draft outreach for
-    model: str = "gemini-2.5-flash"           # Google Gemini model id
+    model: str = "gemini-3.6-flash"           # Google Gemini model id
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], base_dir: str = "") -> "Config":
@@ -68,7 +68,7 @@ class Config:
             ),
             max_posts_per_source=int(data.get("max_posts_per_source", 150)),
             lead_count=int(data.get("lead_count", 10)),
-            model=data.get("model", "gemini-2.5-flash"),
+            model=data.get("model", "gemini-3.6-flash"),
         )
 
     @classmethod

@@ -59,4 +59,4 @@ rank_weights:
 
 max_posts_per_source: 60
 lead_count: 10
-model: gemini-2.5-flash
+model: gemini-3.6-flash

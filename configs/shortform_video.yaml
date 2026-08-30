@@ -60,4 +60,4 @@ rank_weights:
   competition: 0.2
 
 lead_count: 10
-model: gemini-2.5-flash
+model: gemini-3.6-flash

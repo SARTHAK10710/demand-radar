@@ -64,7 +64,7 @@ Each run prints a terminal summary and writes three files to `outputs/`:
 | `--offline` | Force heuristic mode; never call the LLM (no key needed). |
 | `--live` | Force LLM mode even if no key is auto-detected. |
 | `--leads N` | Number of leads to draft outreach for (default from config). |
-| `--model ID` | Override the Gemini model id (e.g. `gemini-2.0-flash`). |
+| `--model ID` | Override the Gemini model id (e.g. `gemini-flash-latest`). |
 | `--outdir DIR` | Where to write reports (default `outputs/`). |
 | `--quiet` | Suppress step-by-step logging. |
 
@@ -110,7 +110,7 @@ competitor_keywords: ["copilot", "pytest", "diffblue"]         # rough competiti
 competition_override: { enterprise: 0.5 }                      # manual estimate 0..1
 rank_weights: { volume: 0.4, intent: 0.4, competition: 0.2 }
 lead_count: 10
-model: gemini-2.5-flash
+model: gemini-3.6-flash
 ```
 
 To point it at a different product, write a new `configs/<product>.yaml` and run it.
