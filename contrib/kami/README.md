@@ -46,6 +46,26 @@ Never fabricate; every signal has a reachable `source_url`; `observed_at` is the
 never invent emails; PLG reach is an in-thread reply routed to *Create distribution*; the
 executor + human approval gate every real action.
 
+## Compliance with Kami's CONTRIBUTING.md
+
+| Kami rule | Status | How we comply |
+|---|---|---|
+| Hermes is the backend — no custom LLM wrapper | ✅ | We ship a `SKILL.md` Hermes executes with its BYOK model; Demand Radar is a contract *reference*, not a dependency or replacement. |
+| Prefer skills over hardcoded prompts | ✅ | The contribution *is* a `SKILL.md`. |
+| Community Edition = self-hosted BYOK; no hosted API | ✅ | Skill requires no external service or hosted Kami/Demand Radar API. |
+| Never invent emails | ✅ | Public handles only; PLG reach = in-thread reply, never a cold email. |
+| Source-backed truth; cite URLs; no fixture greens | ✅ | Every signal carries a reachable `source_url` + dated `observed_at`; never fabricate. |
+| Bind accounts to segment + signal + source; don't Tier-1 on generic mentions | ✅ | `recommended_tier` is a demand-priority hint, **not** a fit tier (`tiering_note` says so in the JSON + the skill). |
+| Real surfaces only for "done"; no mocked send | ✅ | Inbound research only — produces signals/sizing, never claims a send/publish. |
+| Founder approval / stop-before-send intact | ✅ | Upstream of any action; the executor + human gate every send. |
+| Scoped to one concern | ✅ | One skill: community_post signals + segment sizing (a signal provider, **not** a new publish platform, so the opportunity-contract `why_now/draft/risks` + `published_url` rules don't apply). |
+| No secrets committed | ✅ | Keys stay in the environment; nothing secret in these files. |
+| **Eval fixture + `npm run eval:sales` / `build`** | ⬜ **TODO** | Must add a small fixture and run their evals **in the Kami repo** before opening the PR — can't be done from Demand Radar's side. |
+| PR base = `dev`, `feature/…` branch | ⬜ TODO | Done at PR time (see below). |
+
+Everything is compliant **except** the eval fixture + eval run, which by nature happen inside the
+Kami repo. That's the only open item before the PR.
+
 ## How to open the PR (per Kami's CONTRIBUTING.md)
 
 1. **Confirm the canonical repo first** — Demand Radar's notes saw both

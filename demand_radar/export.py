@@ -237,6 +237,8 @@ def to_kami(config: Config, result) -> dict:
             "signals": "Kami AccountSignal (signal_type=community_post)",
             "segments": "evidence-based sizing for icp_segmentation / SalesPlanTier.target_count",
         },
+        "tiering_note": ("recommended_tier ranks by demand volume/score, NOT fit — Kami's "
+                         "fit-based tiering governs; never Tier-1 a segment on volume alone."),
         "note": ("Bottom-up demand sizing + community_post pain signals to complement Kami's "
                  "top-down icp_segmentation. Especially useful for PLG/self-serve segments "
                  "(real people reachable in-thread; no invented emails)."),

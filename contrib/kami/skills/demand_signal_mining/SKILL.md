@@ -10,6 +10,11 @@ finds account signals (funding, hiring, launches). Neither **measures real deman
 adds the missing bottom-up axis: it reads where people actually express the product's pain,
 tags how ready-to-buy they are, and **sizes each segment by real volume**.
 
+**Scope & execution:** an *inbound research* skill — it produces signals and sizing; it never
+sends or publishes, and adds no new outbound surface. Hermes executes it with the workspace's
+BYOK model like any other Kami skill — **no external service, hosted API, or custom LLM wrapper
+required.**
+
 ## Method
 
 1. From the confirmed dossier, take the product one-liner + its core pain, and derive a small
@@ -32,6 +37,8 @@ tags how ready-to-buy they are, and **sizes each segment by real volume**.
   action is an **in-thread reply** routed to *Create distribution* — not a cold consumer email.
 - Ranking is **Fit × Intent × size**; keep them separate axes. Demand volume sizes a segment; it
   does not by itself prove fit.
+- `recommended_tier` is a **demand-priority hint, not a fit tier**. Never Tier-1 a segment on
+  demand volume alone — Kami's fit-based tiering governs, and accounts bind to segment + signal + source.
 - Wait for founder **confirmation** of the dossier before mining.
 
 ## Output
@@ -43,6 +50,7 @@ tags how ready-to-buy they are, and **sizes each segment by real volume**.
   `recommended_tier` (1 = attack first), and up to 5 `evidence_urls`. Feeds
   `icp_segmentation` / `SalesPlanTier.target_count` with evidence instead of a guessed budget.
 
-Reference implementation (Python, producing this exact shape): **Demand Radar** —
-`demand_radar/export.py::to_kami` in https://github.com/SARTHAK10710/demand-radar
-(run `python -m demand_radar <config> --live-ingest --export --export-format kami`).
+Hermes runs this skill and persists the records through the accounts/signals API (never held
+only in agent memory). A reference for the exact JSON output shape — **contract only, not a
+dependency** — lives in Demand Radar: `demand_radar/export.py::to_kami`
+(https://github.com/SARTHAK10710/demand-radar).
