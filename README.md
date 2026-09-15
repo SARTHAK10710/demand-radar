@@ -65,6 +65,8 @@ Each run prints a terminal summary and writes three files to `outputs/`:
 | `--live` | Force LLM mode even if no key is auto-detected. |
 | `--leads N` | Number of leads to draft outreach for (default from config). |
 | `--max-posts N` | Cap total posts analysed — handy for API rate/quota budgets. |
+| `--export` | Also write an executor-agnostic **GTM campaign JSON** (the brain→arms seam). |
+| `--export-objective` | `sales` (default) or `marketing` — the campaign objective for `--export`. |
 | `--model ID` | Override the Gemini model id (e.g. `gemini-flash-latest`). |
 | `--outdir DIR` | Where to write reports (default `outputs/`). |
 | `--quiet` | Suppress step-by-step logging. |
@@ -134,6 +136,26 @@ score = (w_volume · volume) + (w_intent · intent) + (w_competition · (1 − c
 The top-scoring segment is the recommended beachhead — the smallest winnable market
 with the strongest, least-contested demand. Weights are configurable. The catch-all
 "unsegmented" bucket is reported but never recommended as a beachhead.
+
+## The brain→arms seam (`--export`)
+
+Demand Radar is the **brain** — it *derives* who to target and drafts messages. Pair it
+with an **executor** (a GTM tool like [Kami](https://www.trykami.app/), a CRM, or your own
+sender — the **arms**) and you get a closed loop: *derive → execute → measure → re-rank*.
+
+`--export` writes a clean, versioned, **executor-agnostic** campaign contract
+(`outputs/<name>_campaign.json`, schema `demand-radar/gtm-campaign`) that any executor can
+consume. Safety is baked into the payload, not left to the executor:
+
+- every message ships as `status: "draft"` — **Demand Radar never sends**;
+- leads are **gated to actionable intent** (`paying`/`looking`) — no cold-contacting browsers;
+- `guardrails` states human-approval + platform-ToS expectations explicitly;
+- `contactability` is honest — most leads are a public handle, so the default reach is an
+  in-thread reply, not a cold DM.
+
+```bash
+python -m demand_radar configs/ai_test_writer.yaml --live-ingest --export
+```
 
 ## Scope, honestly
 

@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .config import Config
+from .export import write_campaign
 from .pipeline import run
 from .report import render_console
 
@@ -33,6 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--leads", type=int, default=None, help="Override number of leads.")
     p.add_argument("--max-posts", type=int, default=None,
                    help="Cap total posts analysed (useful for API rate/quota budgets).")
+    p.add_argument("--export", action="store_true",
+                   help="Also write an executor-agnostic GTM campaign JSON (the brain->arms seam).")
+    p.add_argument("--export-objective", default="sales", choices=["sales", "marketing"],
+                   help="Campaign objective for --export (default: sales).")
     p.add_argument("--model", default=None, help="Override the Claude model id.")
     p.add_argument("--quiet", action="store_true", help="Suppress step-by-step logging.")
     return p
@@ -74,10 +80,21 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(render_console(result.config, result.segments, result.leads, result.meta))
-    if result.paths:
-        print(f"\nReports written to: {args.outdir}/")
-        for kind, path in result.paths.items():
+
+    export_path = None
+    if args.export:
+        slug = result.config.name or "run"
+        export_path = write_campaign(
+            os.path.join(args.outdir, f"{slug}_campaign.json"),
+            result.config, result, objective=args.export_objective,
+        )
+
+    if result.paths or export_path:
+        print(f"\nWritten to: {args.outdir}/")
+        for kind, path in (result.paths or {}).items():
             print(f"  {kind:<9} {path}")
+        if export_path:
+            print(f"  {'campaign':<9} {export_path}   (executor-agnostic GTM handoff)")
     return 0
 
 

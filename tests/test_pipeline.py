@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from demand_radar.classify import _detect_intent  # noqa: E402
 from demand_radar.config import Config  # noqa: E402
 from demand_radar.llm import _extract_json  # noqa: E402
-from demand_radar.models import Post, ClassifiedPost, Segment  # noqa: E402
+from demand_radar.models import Post, ClassifiedPost, Segment, Lead  # noqa: E402
 from demand_radar.rank import rank  # noqa: E402
 from demand_radar.pipeline import run  # noqa: E402
 
@@ -74,6 +74,38 @@ class TestRanking(unittest.TestCase):
         ranked = rank([big, sharp], cfg)
         self.assertEqual(ranked[0].name, "sharp")
         self.assertEqual(ranked[0].rank, 1)
+
+
+class TestExportSeam(unittest.TestCase):
+    def _lead(self, intent, author, score=0.5):
+        cp = ClassifiedPost(Post("I need a tool for this", "reddit:r/x", author=author),
+                            "seg", "use", "pain", intent)
+        return Lead(classified=cp, lead_score=score, outreach="hi there", outreach_method="template")
+
+    def test_campaign_contract(self):
+        from demand_radar.export import to_campaign, SCHEMA
+        from demand_radar.pipeline import RunResult
+
+        cfg = Config(product="a widget")
+        leads = [self._lead("paying", "a", 0.9), self._lead("looking", "b", 0.7),
+                 self._lead("browsing", "c", 0.3)]
+        seg = Segment(name="seg", posts=[l.classified for l in leads], volume=3)
+        seg.total_score = 0.6
+        result = RunResult(cfg, [seg], leads, {"mode": "offline", "model": "m", "total_posts": 3})
+
+        camp = to_campaign(cfg, result)
+        # Contract shape.
+        self.assertEqual(camp["schema"], SCHEMA)
+        self.assertEqual(camp["beachhead"]["segment"], "seg")
+        # Intent gate excludes the browsing lead.
+        self.assertEqual(camp["campaign"]["lead_count"], 2)
+        self.assertEqual(camp["campaign"]["excluded_low_intent"], 1)
+        self.assertTrue(all(l["intent"] in ("paying", "looking") for l in camp["leads"]))
+        # Safety: nothing is ever marked sent, drafts only.
+        self.assertTrue(all(l["message"]["status"] == "draft" for l in camp["leads"]))
+        self.assertTrue(camp["guardrails"]["drafts_only"])
+        # Priorities are contiguous, best-first.
+        self.assertEqual([l["priority"] for l in camp["leads"]], [1, 2])
 
 
 class TestEndToEndOffline(unittest.TestCase):

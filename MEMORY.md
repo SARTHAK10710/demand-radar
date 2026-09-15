@@ -119,20 +119,32 @@ BRAIN (derive → rank → beachhead → leads+drafts)
 ```
 
 ### Roadmap
-- **v0 — the seam (next):** `demand-radar … --export` emits a clean, documented
-  **lead + campaign JSON** (lead, source, pain, quote, draft, score, intent-tier). Self-contained;
-  needs nothing from Kami. This is the integration contract.
+- **v0 — the seam ✅ DONE:** `demand-radar … --export` writes an **executor-agnostic GTM
+  campaign JSON** (`demand_radar/export.py`, schema `demand-radar/gtm-campaign` v1.0) →
+  `outputs/<name>_campaign.json`. Contains: product, beachhead + `why`, and per-lead
+  {handle, source_url, channel, intent, pain, quote, lead_score, priority, message.draft,
+  contactability}. Safety baked in: every message `status:"draft"` (never sent), leads gated
+  to `paying`/`looking` intent, explicit `guardrails` block. Needs nothing from Kami.
 - **v1 — integrated trigger:** Demand Radar launches a Kami campaign directly from the beachhead list.
 - **v2 — closed loop:** Kami writes outcomes to a shared store; Demand Radar ingests them
   as a `conversion:` source and re-ranks.
 - **Open-source play:** contribute a "Demand Radar import" PR to Kami (stronger for interviews than another solo repo).
 
-### Making it work for *any* product (two levers)
+### Making it work for *any* product (levers)
 1. **Config auto-gen:** an `init "<product description>"` command that LLM-generates
    `pain_keywords`, `segments_hint`, and suggested `sources` → "any product" in ~10s.
 2. **More connectors:** G2 / Product Hunt / LinkedIn (B2B), Amazon / TikTok / App Store
    reviews (consumer), Yelp / Nextdoor (local). Each is a small module like the HN one.
    Seed-set loader already covers anything with no API.
+3. **MCP-backed ingestion (owner's idea — strong):** instead of hand-writing a scraper per
+   platform, add an `mcp:` connector that pulls demand signals through **MCP servers the user
+   authorizes** (Reddit, X, Gmail, web search, GitHub, …). One protocol → many sources; auth
+   lives in the MCP server (no per-platform credential juggling); sidesteps IP-block/scraping
+   pain (e.g. the Reddit 403). Fits our scrappy volumes. Caveats: MCP is query-oriented (not
+   bulk ETL) and server quality varies. Config would gain an `mcp_servers` block; Demand Radar
+   hosts a Python MCP client and maps tool results → Posts. **Distinct from Kami's channel
+   connections**, which are *outbound* (send); this is *inbound* (collect). Bonus inverse idea:
+   expose Demand Radar itself **as** an MCP server so any agent host can call `derive_icp(product)`.
 
 ---
 
@@ -152,6 +164,8 @@ BRAIN (derive → rank → beachhead → leads+drafts)
 
 ## 7. Status snapshot (2026-09-16)
 
-- Repo live, **14 commits**, tests green.
+- Repo live, tests green (11).
 - Gemini integration verified working on `gemini-3.6-flash` (blocked only by the 20/day free quota).
-- **Immediate next step:** build the v0 `--export` adapter (the brain→arms seam).
+- **v0 `--export` adapter shipped** (`demand_radar/export.py`) — the brain→arms seam.
+- **Next step:** v1 — have Demand Radar trigger a Kami campaign directly from the export
+  (or contribute a "Demand Radar import" PR to Kami); then v2 — the `conversion:` feedback source.
