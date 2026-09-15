@@ -1,0 +1,157 @@
+# Demand Radar — Project Memory
+
+> Living context doc: **what this is**, **how we built it**, and **where it's going**.
+> Read this first to get back up to speed in one page.
+
+---
+
+## 1. About Demand Radar (what it is)
+
+A **product-agnostic GTM tool that *derives* a product's Ideal Customer Profile (ICP)
+from real demand signals, instead of guessing it.**
+
+Point it at any product via one config file. It mines where people express the
+product's core pain, classifies and clusters those signals into segments, sizes each,
+recommends the **beachhead** segment to attack first, and produces a **scored lead list
+with drafted (never sent) outreach** for that segment.
+
+**The thesis:** most people *assert* an ICP ("I think devs will like this"). Demand
+Radar *derives* it from evidence ("the data says start with open-source maintainers —
+here's who and what to say").
+
+**Repo:** https://github.com/SARTHAK10710/demand-radar (public)
+**Owner/GitHub:** SARTHAK10710 · **Local path:** `C:\Users\negis\Downloads\demand-radar`
+
+---
+
+## 2. How it works (the pipeline)
+
+Config-driven; the same engine runs for any product by swapping one YAML file.
+
+```
+ingest → classify → cluster + size → rank → beachhead → actionable (leads + outreach)
+```
+
+| Stage | What happens |
+|------|--------------|
+| **Ingest** | Pull real posts from live sources (Hacker News, Stack Exchange, Reddit) + optional seed JSONL |
+| **Classify** | LLM (Google Gemini) tags each post: `segment`, `use_case`, `pain`, `intent` (browsing → looking → paying). Heuristic fallback if no key. |
+| **Cluster + size** | Group tagged posts into segments, count volume → empirically sized candidate ICPs |
+| **Rank** | Score each on volume + intent + rough competition → recommended beachhead |
+| **Outreach** | For the winning segment: scored lead list + a drafted, non-salesy first message per lead |
+
+---
+
+## 3. What's built & how (the journey / key decisions)
+
+- **Language/stack:** Python. LLM behind a single wrapper (`demand_radar/llm.py`) so the
+  provider is swappable in one file.
+- **LLM provider:** started on Anthropic Claude → **switched to Google Gemini** at the
+  owner's request (free tier). Current model: **`gemini-3.6-flash`**.
+  - Gotcha we hit: `gemini-2.5-flash` is deprecated for new users → use 3.6-flash.
+  - Gotcha we hit: Gemini 3.x is a **thinking model** — a small `max_tokens` (300) got
+    eaten by internal reasoning → raised to **1024** so JSON completes.
+  - Added **429 retry/backoff** + lower concurrency for rate limits.
+- **Real data connectors (`demand_radar/ingest.py`):**
+  - `hn:` — Hacker News via the open Algolia API (works anywhere) ✅
+  - `stackexchange:<site>` — Stack Exchange open API ✅
+  - `reddit:r/<sub>` — public JSON (works on a **residential** IP; data-center IPs get 403)
+  - Seed `.jsonl` loader for offline / no-API sources.
+- **Degrades gracefully:** with no `GEMINI_API_KEY` it runs fully offline (heuristic
+  classify + templated outreach), and every result records which `method` produced it.
+- **Reports:** console + Markdown + **theme-aware HTML** (light/dark toggle, score ring,
+  intent pills, per-lead copy buttons) + JSON.
+- **Configs shipped:**
+  - `configs/ai_test_writer.yaml` — a dev tool; runs on **100% live** HN + Stack Exchange + Reddit data.
+  - `configs/shortform_video.yaml` — short-form-video tool; offline **synthetic** seed set + optional live Reddit.
+- **Tests:** `tests/test_pipeline.py` (10 passing — JSON extraction, intent negation, ranking, full offline run).
+- **Run-in-browser:** `demand_radar_colab.ipynb` →
+  https://colab.research.google.com/github/SARTHAK10710/demand-radar/blob/main/demand_radar_colab.ipynb
+- **Live demo artifact (private, owner controls sharing):**
+  https://claude.ai/code/artifact/8c245f76-881a-4832-bd96-137fb90cbb47
+- **CLI flags:** `--live-ingest`, `--offline`, `--live`, `--leads N`, `--model ID`,
+  `--max-posts N`, `--outdir`, `--quiet`.
+
+**Proof the LLM step earns its place:** on live data, Gemini correctly labeled several
+"Ask HN: Who's hiring?" posts as `none` — noise a keyword filter would have counted as demand.
+
+---
+
+## 4. Hard constraints we learned
+
+- **Gemini free tier = 20 requests / DAY** (and 5 / minute) for `gemini-3.6-flash`.
+  A full 186-post live run isn't feasible on free tier → needs billing or a `--max-posts`
+  cap. This is the real bottleneck, not the code.
+- Reddit blocks data-center IPs (403 in sandboxes) — works on a normal home connection.
+- Upwork / Fiverr / YouTube: no free API → seed-set only for now.
+
+---
+
+## 5. What we're building next (the vision)
+
+**Combine the "brain" (Demand Radar) with "arms" (an executor like Kami — trykami.app)
+into a closed-loop GTM engine.**
+
+- **Demand Radar = brain:** decides *who* to target and *where to start* (derivation + sizing).
+- **Kami = arms:** *executes* — find, draft, **send** outreach / publish content (with approval gates).
+- **The loop (the moat):** execution outcomes (opened / replied / converted per segment)
+  feed **back** into Demand Radar as a `conversion:` signal → re-rank segments on **proven**
+  results, not just predicted intent. The *derived* ICP becomes a *validated* ICP.
+
+**How Kami actually works (from trykami.app):**
+1. Enter your **domain** → Kami builds a **dossier about *you*** (the seller) → you confirm "that's us".
+2. Choose **Find customers (Sales)** or **Create distribution (Marketing)**.
+3. **Approve small batches** before anything sends or posts (human-in-loop).
+4. Conversational — "ask Kami anytime," grounded in live campaign state.
+
+**Where the seam is (sharpened):** Kami knows *who you are* (dossier from your domain) but
+**does not empirically derive & rank *who wants you*** from external demand. That's Demand
+Radar's differentiator. So Demand Radar's ranked **beachhead + scored lead list** becomes the
+evidence-backed input to Kami's **Find customers (Sales)** mode — Kami stops guessing the
+target and executes against a *derived, sized* one; its batch-approval + campaign-state UX is
+where the loop's outcomes get captured to feed back.
+
+```
+BRAIN (derive → rank → beachhead → leads+drafts)
+   → ARMS (send / publish, gated)
+   → OUTCOMES (reply/convert per segment)
+   → back into BRAIN (re-rank on real conversion)
+```
+
+### Roadmap
+- **v0 — the seam (next):** `demand-radar … --export` emits a clean, documented
+  **lead + campaign JSON** (lead, source, pain, quote, draft, score, intent-tier). Self-contained;
+  needs nothing from Kami. This is the integration contract.
+- **v1 — integrated trigger:** Demand Radar launches a Kami campaign directly from the beachhead list.
+- **v2 — closed loop:** Kami writes outcomes to a shared store; Demand Radar ingests them
+  as a `conversion:` source and re-ranks.
+- **Open-source play:** contribute a "Demand Radar import" PR to Kami (stronger for interviews than another solo repo).
+
+### Making it work for *any* product (two levers)
+1. **Config auto-gen:** an `init "<product description>"` command that LLM-generates
+   `pain_keywords`, `segments_hint`, and suggested `sources` → "any product" in ~10s.
+2. **More connectors:** G2 / Product Hunt / LinkedIn (B2B), Amazon / TikTok / App Store
+   reviews (consumer), Yelp / Nextdoor (local). Each is a small module like the HN one.
+   Seed-set loader already covers anything with no API.
+
+---
+
+## 6. Guardrails / principles (don't regress these)
+
+- **Drafts, never sends.** Demand Radar only drafts outreach. If wired to an executor,
+  gate real sends on **`paying`/`looking` intent only**, keep **human approval**, and respect
+  platform ToS / anti-spam (CAN-SPAM, Reddit/HN rules). Consent is the #1 real-world risk.
+- **Honest scoping.** Scrappy data layer is fine — the point is the system and the reasoning,
+  not data volume. Always report `mode`, `method`, and `unsegmented` count transparently.
+- **Never commit secrets.** `GEMINI_API_KEY` lives in the environment / `.env` (gitignored),
+  never in the repo. `outputs/` (which may contain real handles) is gitignored.
+- **Public-artifact privacy.** Don't broadcast real individuals' handles + outreach without
+  the owner's informed choice; artifacts are private by default.
+
+---
+
+## 7. Status snapshot (2026-09-16)
+
+- Repo live, **14 commits**, tests green.
+- Gemini integration verified working on `gemini-3.6-flash` (blocked only by the 20/day free quota).
+- **Immediate next step:** build the v0 `--export` adapter (the brain→arms seam).
