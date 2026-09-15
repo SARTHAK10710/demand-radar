@@ -75,6 +75,7 @@ def build_leads(
 
     if llm.available:
         logger(f"  [outreach] drafting {len(leads)} messages with {config.model}")
+        llm.warmup()  # build the client once in the main thread before fanning out
 
         def _fill(lead: Lead) -> Lead:
             msg = _draft_llm(llm, config, lead)

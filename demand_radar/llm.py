@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from typing import Any, Optional
 
 
@@ -30,6 +31,7 @@ class LLM:
     ):
         self.model = model
         self._client = None
+        self._client_lock = threading.Lock()
         self._last_error: Optional[str] = None
         self.available = self._detect(prefer_offline, force_live)
 
@@ -52,12 +54,26 @@ class LLM:
 
     @property
     def client(self):
+        # Thread-safe, create-once. Without the lock, concurrent classify workers
+        # can each build a genai.Client(); an orphaned one gets GC'd mid-request and
+        # raises "client has been closed". One canonical client, held on the instance,
+        # keeps a stable strong reference for the life of the run.
         if self._client is None:
-            from google import genai
+            with self._client_lock:
+                if self._client is None:
+                    from google import genai
 
-            # Reads GEMINI_API_KEY (or GOOGLE_API_KEY) from the environment.
-            self._client = genai.Client()
+                    # Reads GEMINI_API_KEY (or GOOGLE_API_KEY) from the environment.
+                    self._client = genai.Client()
         return self._client
+
+    def warmup(self) -> None:
+        """Create the client eagerly (call in the main thread before a pool)."""
+        if self.available:
+            try:
+                _ = self.client
+            except Exception as e:  # offline/no-key stays graceful
+                self._last_error = f"{type(e).__name__}: {e}"
 
     @property
     def last_error(self) -> Optional[str]:

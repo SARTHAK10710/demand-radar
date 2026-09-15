@@ -160,6 +160,7 @@ def classify_all(
 
     logger(f"  [classify] classifying {len(posts)} posts with {config.model} "
            f"({max_workers} workers)")
+    llm.warmup()  # build the client once in the main thread before fanning out
     done = 0
     fallbacks = 0
     with ThreadPoolExecutor(max_workers=max_workers) as pool:

@@ -141,6 +141,22 @@ class TestExportSeam(unittest.TestCase):
         self.assertEqual(s0["recommended_tier"], 1)
 
 
+class TestLLMClient(unittest.TestCase):
+    def test_client_is_cached(self):
+        from demand_radar.llm import LLM
+        llm = LLM(prefer_offline=True)
+        sentinel = object()
+        llm._client = sentinel
+        self.assertIs(llm.client, sentinel)   # returns the one cached client
+        self.assertIs(llm.client, sentinel)   # idempotent — never rebuilds
+
+    def test_warmup_offline_is_safe(self):
+        from demand_radar.llm import LLM
+        llm = LLM(prefer_offline=True)         # not available (no client)
+        llm.warmup()                            # must not raise or build a client
+        self.assertIsNone(llm._client)
+
+
 class TestEndToEndOffline(unittest.TestCase):
     def test_full_run(self):
         cfg = Config.load(CONFIG_PATH)
