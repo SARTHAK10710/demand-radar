@@ -42,7 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "demand signals + segment sizing. Default: generic.")
     p.add_argument("--export-objective", default="sales", choices=["sales", "marketing"],
                    help="Campaign objective for generic --export (default: sales).")
-    p.add_argument("--model", default=None, help="Override the Claude model id.")
+    p.add_argument("--provider", default=None,
+                   choices=["auto", "gemini", "openai", "anthropic"],
+                   help="LLM provider (default: auto-detect from whichever API key is set).")
+    p.add_argument("--model", default=None, help="Override the model id.")
     p.add_argument("--quiet", action="store_true", help="Suppress step-by-step logging.")
     return p
 
@@ -66,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.leads is not None:
         config.lead_count = args.leads
+    if args.provider is not None:
+        config.provider = args.provider
     if args.model is not None:
         config.model = args.model
 

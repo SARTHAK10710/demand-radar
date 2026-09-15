@@ -46,8 +46,16 @@ ingest → classify → cluster + size → rank → beachhead → actionable (le
 
 - **Language/stack:** Python. LLM behind a single wrapper (`demand_radar/llm.py`) so the
   provider is swappable in one file.
-- **LLM provider:** started on Anthropic Claude → **switched to Google Gemini** at the
-  owner's request (free tier). Current model: **`gemini-3.6-flash`**.
+- **LLM provider:** **provider-agnostic** — auto-detects Gemini / OpenAI / Claude from
+  whichever API key is set (connect Gemini → Gemini, OpenAI → OpenAI, Claude → Claude);
+  `provider:` config or `--provider` forces one. Default Gemini (`gemini-3.6-flash`, free tier);
+  defaults `gpt-4o-mini` / `claude-haiku-4-5`. No key → offline heuristic. (History: Claude →
+  Gemini at owner's request → now all three.) In the Kami contribution this is moot — Hermes
+  (BYOK) runs the skill with the user's own model.
+- **"Offline" = no-LLM mode**, NOT no-internet: heuristic keyword classifier + templated
+  outreach; `--live-ingest` still pulls real posts. It's the always-runs fallback.
+- **MCP social connectors (LinkedIn/X/etc.): NOT built yet** — still just an idea (roadmap
+  lever #3). Live connectors today = HN, Stack Exchange, Reddit + seed loader.
   - Gotcha we hit: `gemini-2.5-flash` is deprecated for new users → use 3.6-flash.
   - Gotcha we hit: Gemini 3.x is a **thinking model** — a small `max_tokens` (300) got
     eaten by internal reasoning → raised to **1024** so JSON completes.

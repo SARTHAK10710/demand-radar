@@ -55,7 +55,8 @@ def run(
         posts = posts[:max_posts]
         logger(f"  [ingest] capped to {max_posts} posts (rate/quota budget)")
 
-    llm = LLM(model=config.model, prefer_offline=prefer_offline, force_live=force_live)
+    llm = LLM(model=config.model, provider=config.provider,
+              prefer_offline=prefer_offline, force_live=force_live)
     mode = "live" if llm.available else "offline"
 
     logger(f"▸ 2/6 classify  ({mode})")
@@ -85,7 +86,8 @@ def run(
     meta = {
         "run_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "mode": mode,
-        "model": config.model,
+        "provider": llm.provider if mode == "live" else None,
+        "model": llm.model if mode == "live" else config.model,
         "total_posts": len(posts),
         "relevant_posts": len(relevant),
         "unsegmented": unsegmented,

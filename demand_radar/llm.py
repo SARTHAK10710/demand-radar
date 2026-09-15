@@ -1,14 +1,17 @@
-"""Thin wrapper around Google Gemini for Demand Radar's two LLM steps.
+"""Provider-agnostic LLM wrapper for Demand Radar's two LLM steps.
 
-The whole pipeline talks to the model through just this class, so the provider
-lives in one place. Two design goals:
-  1. Keep provider details (SDK, JSON mode, model id) isolated here.
-  2. Degrade gracefully. With no GEMINI_API_KEY the tool still runs end to end
-     using heuristic fallbacks, so it is always demoable; with a key it uses
-     Gemini for the real classification and outreach.
+Bring your own key — the tool auto-detects the provider from whichever key is set:
 
-Uses the unified `google-genai` SDK (`from google import genai`). Get a free key
-at https://aistudio.google.com/apikey and set GEMINI_API_KEY.
+    GEMINI_API_KEY / GOOGLE_API_KEY  -> Google Gemini   (default model gemini-3.6-flash)
+    OPENAI_API_KEY                   -> OpenAI           (default model gpt-4o-mini)
+    ANTHROPIC_API_KEY                -> Anthropic Claude (default model claude-haiku-4-5)
+
+Set `provider:` in the config to force one, or `--provider`. With no key it degrades to a
+transparent keyword heuristic, so the tool always runs. The whole pipeline talks to the model
+only through `complete_text` / `complete_json`, so the provider lives entirely in this file.
+
+The OpenAI and Anthropic paths follow each SDK's documented shape; the Gemini path is the one
+exercised in this repo's CI. All three degrade gracefully on error (per-item heuristic fallback).
 """
 
 from __future__ import annotations
@@ -19,77 +22,133 @@ import re
 import threading
 from typing import Any, Optional
 
+DEFAULT_MODELS = {
+    "gemini": "gemini-3.6-flash",
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-haiku-4-5",
+}
+
+# Model-name prefixes used to tell whether a configured model matches the provider,
+# so a Gemini model id in a config doesn't get sent to OpenAI/Claude verbatim.
+_MODEL_PREFIXES = {
+    "gemini": ("gemini",),
+    "openai": ("gpt", "o1", "o3", "o4", "chatgpt"),
+    "anthropic": ("claude",),
+}
+
+_SDK = {"gemini": "google", "openai": "openai", "anthropic": "anthropic"}
+
 
 class LLM:
-    """Wraps the Gemini client with JSON parsing and a graceful offline mode."""
+    """Wraps Gemini / OpenAI / Anthropic behind one interface, with an offline fallback."""
 
     def __init__(
         self,
         model: str = "gemini-3.6-flash",
+        provider: str = "auto",
         prefer_offline: bool = False,
         force_live: bool = False,
     ):
+        self.requested_model = model
+        self.provider: Optional[str] = None
         self.model = model
         self._client = None
         self._client_lock = threading.Lock()
         self._last_error: Optional[str] = None
-        self.available = self._detect(prefer_offline, force_live)
+        self.available = self._detect(provider, prefer_offline, force_live)
 
-    # -- availability -------------------------------------------------------
+    # -- provider / model resolution ---------------------------------------
     @staticmethod
-    def _has_credentials() -> bool:
-        return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    def _pick_provider(explicit: str) -> Optional[str]:
+        if explicit and explicit != "auto":
+            return explicit
+        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            return "gemini"
+        if os.environ.get("OPENAI_API_KEY"):
+            return "openai"
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return "anthropic"
+        return None
 
-    def _detect(self, prefer_offline: bool, force_live: bool) -> bool:
+    def _resolve_model(self) -> str:
+        m, prov = self.requested_model, self.provider
+        if m and any(m.startswith(p) for p in _MODEL_PREFIXES.get(prov, ())):
+            return m  # the configured model already belongs to this provider
+        return DEFAULT_MODELS.get(prov, m)  # otherwise use the provider's default
+
+    def _sdk_ok(self, provider: str) -> bool:
+        try:
+            __import__(_SDK[provider])
+            return True
+        except ImportError:
+            self._last_error = f"{provider} SDK not installed (pip install {_SDK[provider]})"
+            return False
+
+    def _detect(self, provider: str, prefer_offline: bool, force_live: bool) -> bool:
         if prefer_offline:
             return False
+        self.provider = self._pick_provider(provider)
         if force_live:
+            self.provider = self.provider or "gemini"
+            self.model = self._resolve_model()
             return True
-        try:
-            from google import genai  # noqa: F401
-        except ImportError:
-            self._last_error = "google-genai SDK not installed (`pip install google-genai`)"
+        if self.provider is None:
+            self._last_error = ("no LLM credentials — set GEMINI_API_KEY, OPENAI_API_KEY, "
+                                "or ANTHROPIC_API_KEY")
             return False
-        return self._has_credentials()
+        if not self._sdk_ok(self.provider):
+            return False
+        self.model = self._resolve_model()
+        return True
 
+    # -- client (thread-safe, create-once) ---------------------------------
     @property
     def client(self):
-        # Thread-safe, create-once. Without the lock, concurrent classify workers
-        # can each build a genai.Client(); an orphaned one gets GC'd mid-request and
-        # raises "client has been closed". One canonical client, held on the instance,
-        # keeps a stable strong reference for the life of the run.
         if self._client is None:
             with self._client_lock:
                 if self._client is None:
-                    from google import genai
-
-                    # Reads GEMINI_API_KEY (or GOOGLE_API_KEY) from the environment.
-                    self._client = genai.Client()
+                    self._client = self._build_client()
         return self._client
+
+    def _build_client(self):
+        if self.provider == "gemini":
+            from google import genai
+            return genai.Client()          # reads GEMINI_API_KEY / GOOGLE_API_KEY
+        if self.provider == "openai":
+            from openai import OpenAI
+            return OpenAI()                # reads OPENAI_API_KEY
+        if self.provider == "anthropic":
+            import anthropic
+            return anthropic.Anthropic()   # reads ANTHROPIC_API_KEY
+        raise RuntimeError(f"unknown provider: {self.provider}")
 
     def warmup(self) -> None:
         """Create the client eagerly (call in the main thread before a pool)."""
         if self.available:
             try:
                 _ = self.client
-            except Exception as e:  # offline/no-key stays graceful
+            except Exception as e:
                 self._last_error = f"{type(e).__name__}: {e}"
 
     @property
     def last_error(self) -> Optional[str]:
         return self._last_error
 
-    # -- raw generation -----------------------------------------------------
-    def _generate(
-        self,
-        system: str,
-        user: str,
-        max_tokens: int,
-        temperature: float,
-        json_mode: bool,
-        retries: int = 2,
-    ) -> Optional[str]:
-        """One generation, with 429 backoff. Returns the text, or None on failure."""
+    # -- generation dispatch -----------------------------------------------
+    def _generate(self, system, user, max_tokens, temperature, json_mode) -> Optional[str]:
+        try:
+            if self.provider == "gemini":
+                return self._gen_gemini(system, user, max_tokens, temperature, json_mode)
+            if self.provider == "openai":
+                return self._gen_openai(system, user, max_tokens, json_mode)
+            if self.provider == "anthropic":
+                return self._gen_anthropic(system, user, max_tokens)
+        except Exception as e:  # never let one bad call kill the pipeline
+            self._last_error = f"{type(e).__name__}: {e}"
+            return None
+        return None
+
+    def _gen_gemini(self, system, user, max_tokens, temperature, json_mode, retries=2):
         import time
 
         from google.genai import types
@@ -103,21 +162,43 @@ class LLM:
         for attempt in range(retries + 1):
             try:
                 resp = self.client.models.generate_content(
-                    model=self.model, contents=user, config=config
-                )
-            except Exception as e:  # never let one bad call kill the pipeline
+                    model=self.model, contents=user, config=config)
+            except Exception as e:
                 self._last_error = f"{type(e).__name__}: {e}"
                 if _is_rate_limit(e) and attempt < retries:
                     time.sleep(_retry_delay(str(e), attempt))
                     continue
                 return None
-
             text = getattr(resp, "text", None)
             if not text:
                 self._last_error = "empty response (possibly safety-blocked or truncated)"
                 return None
             return text.strip()
         return None
+
+    def _gen_openai(self, system, user, max_tokens, json_mode):
+        kwargs = dict(
+            model=self.model,
+            max_tokens=max_tokens,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+        )
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = self.client.chat.completions.create(**kwargs)
+        text = resp.choices[0].message.content if resp.choices else None
+        return text.strip() if text else None
+
+    def _gen_anthropic(self, system, user, max_tokens):
+        # No temperature (removed on current Claude models); JSON via system instruction.
+        resp = self.client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        return text.strip() or None
 
     # -- public helpers -----------------------------------------------------
     def complete_text(
@@ -131,9 +212,7 @@ class LLM:
         temperature: float = 0.0, effort: str | None = None,
     ) -> Optional[dict[str, Any]]:
         raw = self._generate(system, user, max_tokens, temperature, json_mode=True)
-        if raw is None:
-            return None
-        return _extract_json(raw)
+        return _extract_json(raw) if raw is not None else None
 
 
 def _is_rate_limit(e: Exception) -> bool:

@@ -25,15 +25,17 @@ Config-driven, so the same tool runs for any product by swapping one file.
 | Stage | What happens |
 |------|--------------|
 | **1. Ingest** | Pull posts from real, live sources (Hacker News, Stack Exchange, Reddit). |
-| **2. Classify** | An LLM step (Google Gemini) tags each post: `segment`, `use_case`, `pain`, and `intent` (`browsing` / `looking` / `paying`). |
+| **2. Classify** | An LLM step (Gemini / OpenAI / Claude — auto-detected) tags each post: `segment`, `use_case`, `pain`, and `intent` (`browsing` / `looking` / `paying`). |
 | **3. Cluster + size** | Group tagged posts into segments and count volume — an *empirically sized* set of candidate ICPs. |
 | **4. Rank** | Score each segment on **volume**, **intent**, and **rough competition**. Output the recommended beachhead. |
 | **5. Actionable layer** | For the winning segment, score a lead list and draft a personalised, non-salesy first message per lead. |
 
-The two LLM steps use **Google Gemini** (the free tier is plenty for a demo).
-**No API key? It still runs** — every LLM step degrades to a transparent keyword
-heuristic, and each result records which `method` produced it. So it's always
-demoable, and honest about how each label was made.
+The two LLM steps are **provider-agnostic** — set a `GEMINI_API_KEY`, `OPENAI_API_KEY`,
+or `ANTHROPIC_API_KEY` and Demand Radar auto-detects which to use (connect Gemini → Gemini,
+OpenAI → OpenAI, Claude → Claude). Force one with `provider:` in the config or `--provider`.
+**No API key? It still runs** — every LLM step degrades to a transparent keyword heuristic,
+and each result records which `method` produced it. So it's always demoable, and honest
+about how each label was made.
 
 ---
 
@@ -42,8 +44,9 @@ demoable, and honest about how each label was made.
 ```bash
 pip install -r requirements.txt
 
-# Real, live data + real Gemini classification (recommended)
+# Real, live data + real LLM classification (recommended)
 export GEMINI_API_KEY=AIza...            # free key: https://aistudio.google.com/apikey
+# ...or OPENAI_API_KEY / ANTHROPIC_API_KEY — the provider is auto-detected
 python -m demand_radar configs/ai_test_writer.yaml --live-ingest
 
 # No key? Still runs on real data with the offline heuristic classifier
@@ -68,7 +71,8 @@ Each run prints a terminal summary and writes three files to `outputs/`:
 | `--export` | Also write a **GTM handoff JSON** (the brain→arms seam). |
 | `--export-format` | `generic` (default) or `kami` — Kami-contract demand signals + segment sizing. |
 | `--export-objective` | `sales` (default) or `marketing` — objective for generic `--export`. |
-| `--model ID` | Override the Gemini model id (e.g. `gemini-flash-latest`). |
+| `--provider` | `auto` (default), `gemini`, `openai`, or `anthropic`. |
+| `--model ID` | Override the model id (provider default is used if it mismatches the provider). |
 | `--outdir DIR` | Where to write reports (default `outputs/`). |
 | `--quiet` | Suppress step-by-step logging. |
 
@@ -188,7 +192,7 @@ demand_radar/
   rank.py       # score segments, pick the beachhead
   outreach.py   # LLM step 2 — scored leads + drafted messages
   report.py     # console / markdown / html / json renderers
-  llm.py        # the ONLY file that talks to the model (Gemini) — swap providers here
+  llm.py        # the ONLY file that talks to a model — Gemini / OpenAI / Claude, auto-detected
   pipeline.py   # orchestrates the six stages
   cli.py        # command-line entry point
 configs/        # product configs (YAML)
@@ -205,8 +209,8 @@ python -m unittest discover -s tests -v
 
 ## Notes
 
-- **Swapping LLM provider:** everything model-specific lives in `llm.py`. It currently
-  uses the `google-genai` SDK; re-point it at another provider without touching the rest
-  of the pipeline.
+- **LLM provider:** everything model-specific lives in `llm.py`, which auto-detects Gemini /
+  OpenAI / Claude from whichever API key is set (install that provider's SDK — see
+  `requirements.txt`). The rest of the pipeline never touches a provider.
 - **Outreach is drafted, never sent.** The tool writes first-message drafts for review;
   it does not contact anyone.

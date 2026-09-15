@@ -1,4 +1,8 @@
 # Core
-google-genai>=1.0        # Google Gemini — the two LLM steps (classify + outreach)
 pyyaml>=6.0              # config loading
 requests>=2.31          # live ingestion (Hacker News, Stack Exchange, Reddit)
+
+# LLM providers — install the one whose key you use (auto-detected). Gemini is the default.
+google-genai>=1.0       # GEMINI_API_KEY / GOOGLE_API_KEY
+# openai>=1.40          # OPENAI_API_KEY
+# anthropic>=0.40       # ANTHROPIC_API_KEY

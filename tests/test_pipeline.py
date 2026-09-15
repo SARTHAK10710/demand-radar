@@ -157,6 +157,38 @@ class TestLLMClient(unittest.TestCase):
         self.assertIsNone(llm._client)
 
 
+class TestProviderRouting(unittest.TestCase):
+    def test_pick_provider_by_key(self):
+        from demand_radar.llm import LLM
+        keys = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
+        saved = {k: os.environ.get(k) for k in keys}
+        try:
+            for k in keys:
+                os.environ.pop(k, None)
+            self.assertIsNone(LLM._pick_provider("auto"))          # no keys -> offline
+            os.environ["OPENAI_API_KEY"] = "x"
+            self.assertEqual(LLM._pick_provider("auto"), "openai")
+            os.environ["ANTHROPIC_API_KEY"] = "x"
+            os.environ["GEMINI_API_KEY"] = "x"
+            self.assertEqual(LLM._pick_provider("auto"), "gemini")  # priority order
+            self.assertEqual(LLM._pick_provider("anthropic"), "anthropic")  # explicit wins
+        finally:
+            for k, v in saved.items():
+                os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+
+    def test_model_resolution(self):
+        from demand_radar.llm import LLM
+        # force_live skips SDK/credential checks so we can test routing offline.
+        self.assertEqual(LLM(model="gemini-3.6-flash", provider="gemini", force_live=True).model,
+                         "gemini-3.6-flash")
+        # A Gemini model id sent to OpenAI falls back to OpenAI's default, not verbatim.
+        self.assertEqual(LLM(model="gemini-3.6-flash", provider="openai", force_live=True).model,
+                         "gpt-4o-mini")
+        # An explicit matching model is kept.
+        self.assertEqual(LLM(model="claude-opus-5", provider="anthropic", force_live=True).model,
+                         "claude-opus-5")
+
+
 class TestEndToEndOffline(unittest.TestCase):
     def test_full_run(self):
         cfg = Config.load(CONFIG_PATH)
