@@ -106,10 +106,43 @@ into a closed-loop GTM engine.**
 
 **Where the seam is (sharpened):** Kami knows *who you are* (dossier from your domain) but
 **does not empirically derive & rank *who wants you*** from external demand. That's Demand
-Radar's differentiator. So Demand Radar's ranked **beachhead + scored lead list** becomes the
-evidence-backed input to Kami's **Find customers (Sales)** mode — Kami stops guessing the
-target and executes against a *derived, sized* one; its batch-approval + campaign-state UX is
-where the loop's outcomes get captured to feed back.
+Radar's differentiator.
+
+### Kami repo — grounded findings (read 2026-09-16)
+Repo read: `github.com/kami-community/kami` (docs also reference `github.com/saranambiar/kami`
+— **confirm the canonical fork before opening a PR**).
+- **Stack:** Next.js `web/` + **Hermes** agent gateway (`:8642`) + Supabase; TypeScript; MIT.
+  Heavy to run locally (Hermes + DB migrations 001–010 + model key).
+- **Skills-first:** extend via `skills/<name>/SKILL.md` — "prefer skills over hardcoded prompts."
+  New platform = skill + opportunity contract (URL, evidence, why_now, draft, risks).
+- **Typed contracts** (`contracts/contracts.ts`): `Account`, `AccountSignal`
+  (provider, signal_type, detail, source_url, observed_at, confidence, evidence_text),
+  `LeadScore` (factors: fit/intent/contactability/priority), `SalesPlan`+`SalesPlanTier`,
+  `Prospect`, `Draft`, `Signal` (types include **`community_post`**). `SalesSegment` lives in
+  `web/lib/salesTypes.ts`.
+- **Safety (matches Demand Radar's guardrails):** never invent emails; PLG/D2C never blast →
+  route to distribution; stop-before-send; founder approval; suppression/DNC; real receipts for
+  "done"; sources with dated URLs (<90d); no fixture greens.
+- **Contributing:** PR base = **`dev`** (NOT main); branch `feature/…`; small/scoped; add a
+  `SKILL.md` with sources + an eval fixture; run `npm run eval:sales` + `npm run build`; rejected
+  if it weakens safety/evals or mocks sends.
+
+**Sharpened differentiator:** Kami's `icp_segmentation` is **top-down** (3–5 segments reasoned
+from the seller's domain positioning); `signal_research` finds account signals (funding/hiring).
+**Neither sizes segments by measured external demand.** Demand Radar is **bottom-up demand
+sizing** — the missing empirical axis.
+
+### Revised integration plan (better than a mega-merge)
+Contribute Demand Radar's distinctive capability *into* Kami (skills-first, its native path):
+- **(a) A new skill `demand_sizing`** — mine/cluster/**size**/rank segments from real demand →
+  output in Kami's `SalesSegment`/`SalesPlanTier` shape + evidence URLs. Complements
+  `icp_segmentation` by adding the empirical sizing axis it lacks.
+- **(b) A `community_post` signal provider** for `signal_research` — Demand Radar's classified
+  pain posts map 1:1 onto `AccountSignal` (source_url + observed_at + confidence + evidence_text).
+- Keep Demand Radar's generic `--export`; add a `--export kami` that emits these exact shapes.
+- **Honest:** Kami is broad + heavy to run; the realistic, high-value win is a **focused,
+  accepted skill/provider PR**, not merging two products. That PR (into a real OSS project) +
+  the Demand Radar repo behind it is a strong interview story.
 
 ```
 BRAIN (derive → rank → beachhead → leads+drafts)
