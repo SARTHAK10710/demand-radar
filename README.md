@@ -65,8 +65,9 @@ Each run prints a terminal summary and writes three files to `outputs/`:
 | `--live` | Force LLM mode even if no key is auto-detected. |
 | `--leads N` | Number of leads to draft outreach for (default from config). |
 | `--max-posts N` | Cap total posts analysed — handy for API rate/quota budgets. |
-| `--export` | Also write an executor-agnostic **GTM campaign JSON** (the brain→arms seam). |
-| `--export-objective` | `sales` (default) or `marketing` — the campaign objective for `--export`. |
+| `--export` | Also write a **GTM handoff JSON** (the brain→arms seam). |
+| `--export-format` | `generic` (default) or `kami` — Kami-contract demand signals + segment sizing. |
+| `--export-objective` | `sales` (default) or `marketing` — objective for generic `--export`. |
 | `--model ID` | Override the Gemini model id (e.g. `gemini-flash-latest`). |
 | `--outdir DIR` | Where to write reports (default `outputs/`). |
 | `--quiet` | Suppress step-by-step logging. |
@@ -155,6 +156,16 @@ consume. Safety is baked into the payload, not left to the executor:
 
 ```bash
 python -m demand_radar configs/ai_test_writer.yaml --live-ingest --export
+```
+
+**Kami-native handoff:** `--export-format kami` maps the run onto [Kami's](https://www.trykami.app)
+typed contracts — every mined post becomes an `AccountSignal` (`signal_type: community_post`) and
+every segment gets an evidence-based `demand_volume` + `recommended_tier`. This adds the
+**bottom-up demand sizing** Kami's top-down `icp_segmentation` lacks. Packaged as a Kami skill in
+[`contrib/kami/`](contrib/kami/).
+
+```bash
+python -m demand_radar configs/ai_test_writer.yaml --live-ingest --export --export-format kami
 ```
 
 ## Scope, honestly

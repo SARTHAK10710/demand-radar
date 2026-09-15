@@ -107,6 +107,39 @@ class TestExportSeam(unittest.TestCase):
         # Priorities are contiguous, best-first.
         self.assertEqual([l["priority"] for l in camp["leads"]], [1, 2])
 
+    def test_kami_contract(self):
+        from demand_radar.export import to_kami, KAMI_SCHEMA
+        from demand_radar.pipeline import RunResult
+
+        cps = [
+            ClassifiedPost(Post("I need this", "hn:comments",
+                               url="https://news.ycombinator.com/item?id=1"),
+                           "seg", "use", "flaky tests", "looking"),
+            ClassifiedPost(Post("we pay for this", "reddit:r/x", url="https://reddit.com/2"),
+                           "seg", "use", "coverage", "paying"),
+            ClassifiedPost(Post("no link here", "hn:comments", url=""),  # dropped: no source_url
+                           "seg", "use", "pain", "looking"),
+        ]
+        seg = Segment(name="seg", posts=cps, volume=3)
+        seg.rank = 1
+        seg.total_score = 0.7
+        seg.intent_breakdown = {"browsing": 0, "looking": 2, "paying": 1}
+        result = RunResult(Config(product="p"), [seg], [],
+                           {"mode": "offline", "model": "m", "total_posts": 3})
+
+        k = to_kami(Config(product="p"), result)
+        self.assertEqual(k["schema"], KAMI_SCHEMA)
+        # Only posts with a source_url become signals (Kami hard rule).
+        self.assertEqual(len(k["signals"]), 2)
+        self.assertTrue(all(s["signal_type"] == "community_post" for s in k["signals"]))
+        self.assertTrue(all(s["source_url"] for s in k["signals"]))
+        self.assertTrue(all(s["intent"] in ("browsing", "looking", "paying") for s in k["signals"]))
+        # Empirical sizing surfaces on the segment.
+        s0 = k["segments"][0]
+        self.assertEqual(s0["demand_volume"], 3)
+        self.assertTrue(s0["is_beachhead"])
+        self.assertEqual(s0["recommended_tier"], 1)
+
 
 class TestEndToEndOffline(unittest.TestCase):
     def test_full_run(self):

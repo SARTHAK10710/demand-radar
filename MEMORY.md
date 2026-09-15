@@ -134,12 +134,15 @@ sizing** — the missing empirical axis.
 
 ### Revised integration plan (better than a mega-merge)
 Contribute Demand Radar's distinctive capability *into* Kami (skills-first, its native path):
-- **(a) A new skill `demand_sizing`** — mine/cluster/**size**/rank segments from real demand →
-  output in Kami's `SalesSegment`/`SalesPlanTier` shape + evidence URLs. Complements
-  `icp_segmentation` by adding the empirical sizing axis it lacks.
-- **(b) A `community_post` signal provider** for `signal_research` — Demand Radar's classified
-  pain posts map 1:1 onto `AccountSignal` (source_url + observed_at + confidence + evidence_text).
-- Keep Demand Radar's generic `--export`; add a `--export kami` that emits these exact shapes.
+- **(a) A new skill `demand_signal_mining`** ✅ BUILT (`contrib/kami/skills/demand_signal_mining/SKILL.md`)
+  — mine/cluster/**size**/rank segments from real demand + emit `community_post` signals.
+  Complements `icp_segmentation` by adding the empirical sizing axis it lacks.
+- **(b) The `community_post` signal mapping** ✅ BUILT — Demand Radar's classified pain posts map
+  1:1 onto `AccountSignal` (provider, source_url, observed_at, confidence, evidence_text + our
+  segment/intent tags), via `--export --export-format kami` (`demand_radar/export.py::to_kami`,
+  schema `kami/demand-signals`). `contrib/kami/README.md` has the contract mapping + PR steps.
+- **Still TODO before PR:** confirm canonical Kami repo (kami-community vs saranambiar); add an
+  eval fixture; open `feature/demand-signal-mining` PR against **`dev`**.
 - **Honest:** Kami is broad + heavy to run; the realistic, high-value win is a **focused,
   accepted skill/provider PR**, not merging two products. That PR (into a real OSS project) +
   the Demand Radar repo behind it is a strong interview story.

@@ -145,8 +145,120 @@ def write_campaign(
     objective: str = "sales_outreach",
     intent_gate: tuple[str, ...] = ("paying", "looking"),
 ) -> str:
-    """Write the campaign JSON to `path` and return the path."""
-    data = to_campaign(config, result, objective, intent_gate)
+    """Write the generic campaign JSON to `path` and return the path."""
+    return _dump(path, to_campaign(config, result, objective, intent_gate))
+
+
+# --------------------------------------------------------------------------- #
+# Kami-native mapping — maps our output onto Kami's typed contracts so it can
+# drop straight into their pipeline (skills-first GTM agent, trykami.app):
+#   * every relevant post -> an AccountSignal with signal_type "community_post"
+#     (provider, detail, source_url, observed_at, confidence, evidence_text) — a
+#     signal type Kami's contract already defines but doesn't systematically mine;
+#   * each segment -> an evidence-backed demand size (volume + intent mix) to give
+#     Kami's top-down `icp_segmentation` the empirical sizing axis it lacks.
+# --------------------------------------------------------------------------- #
+KAMI_SCHEMA = "kami/demand-signals"
+
+
+def _iso_date(ts) -> str | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).date().isoformat()
+    except (ValueError, OSError, OverflowError):
+        return None
+
+
+def _tier_from_rank(rank: int) -> int:
+    """Map a segment rank to a Kami tier (1 = attack first)."""
+    if rank <= 1:
+        return 1
+    if rank <= 3:
+        return 2
+    return 3
+
+
+def _confidence(cp) -> float:
+    """Classifier confidence, decayed if the post is stale (Kami rule: >90d weaker)."""
+    conf = float(cp.confidence)
+    d = _iso_date(cp.post.created_utc)
+    if d:
+        age_days = (datetime.now(timezone.utc).date() - datetime.fromisoformat(d).date()).days
+        if age_days > 90:
+            conf *= 0.5
+    return round(conf, 2)
+
+
+def to_kami(config: Config, result) -> dict:
+    """Build a Kami-contract-shaped demand-signal + segment-sizing payload."""
+    signals: list[dict] = []
+    for seg in result.segments:
+        for cp in seg.posts:
+            if not cp.post.url:  # Kami hard rule: every signal needs a reachable source_url
+                continue
+            summary = " — ".join(x for x in (cp.pain, cp.use_case) if x) or "expressed pain"
+            evidence = cp.post.full_text.replace("\n", " ").strip()
+            signals.append({
+                "provider": _channel(cp.post.source),
+                "signal_type": "community_post",        # Kami Signal/AccountSignal type
+                "detail": f"[{cp.intent}] {summary}",
+                "source_url": cp.post.url,
+                "observed_at": _iso_date(cp.post.created_utc),
+                "confidence": _confidence(cp),
+                "evidence_text": (evidence[:300] + "…") if len(evidence) > 300 else evidence,
+                # Demand Radar's value-add beyond a bare AccountSignal:
+                "segment": cp.segment,
+                "intent": cp.intent,                    # browsing | looking | paying
+            })
+
+    segments = []
+    for seg in result.segments:
+        urls = [p.post.url for p in seg.posts if p.post.url]
+        segments.append({
+            "segment": seg.name,
+            "demand_volume": seg.volume,                # <-- the empirical sizing Kami lacks
+            "intent_mix": seg.intent_breakdown,
+            "demand_score": round(seg.total_score, 3),
+            "rank": seg.rank,
+            "recommended_tier": _tier_from_rank(seg.rank),
+            "is_beachhead": seg.rank == 1,
+            "top_pains": seg.top_pains,
+            "evidence_urls": urls[:5],
+        })
+
+    return {
+        "schema": KAMI_SCHEMA,
+        "schema_version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source_tool": "demand-radar",
+        "product": config.product,
+        "maps_to": {
+            "signals": "Kami AccountSignal (signal_type=community_post)",
+            "segments": "evidence-based sizing for icp_segmentation / SalesPlanTier.target_count",
+        },
+        "note": ("Bottom-up demand sizing + community_post pain signals to complement Kami's "
+                 "top-down icp_segmentation. Especially useful for PLG/self-serve segments "
+                 "(real people reachable in-thread; no invented emails)."),
+        "segments": segments,
+        "signals": signals,
+        "guardrails": {
+            "never_fabricate": True,
+            "every_signal_has_source_url": True,
+            "observed_at_is_event_date": True,
+            "stale_signal_confidence_decayed_after_days": 90,
+            "no_invented_emails": True,
+            "reach": "in_thread_reply (PLG) — executor + human approval required to act",
+        },
+    }
+
+
+def write_kami(path: str, config: Config, result) -> str:
+    """Write the Kami-contract-shaped JSON to `path` and return the path."""
+    return _dump(path, to_kami(config, result))
+
+
+def _dump(path: str, data: dict) -> str:
     os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
