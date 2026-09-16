@@ -134,6 +134,12 @@ Repo read: `github.com/kami-community/kami` (docs also reference `github.com/sar
 - **Contributing:** PR base = **`dev`** (NOT main); branch `feature/…`; small/scoped; add a
   `SKILL.md` with sources + an eval fixture; run `npm run eval:sales` + `npm run build`; rejected
   if it weakens safety/evals or mocks sends.
+- **Hermes (agent backend, NousResearch/hermes-agent):** Python CLI; **supports Gemini natively**
+  (Google AI Studio via OpenAI-compat endpoint) — set `GEMINI_API_KEY`/`GOOGLE_API_KEY` +
+  `hermes config set model.provider gemini` + a Gemini model; Windows home `%LOCALAPPDATA%\hermes`.
+  Also OpenRouter/Anthropic/OpenAI/many more. **Kami's reference + evals use OpenAI `gpt-5.4`
+  (`provider: openai-api`)**, so evals are calibrated on that; Gemini runs it but may score
+  differently. Local run needs: Node 20 + Hermes gateway (:8642) + Supabase (migrations 001–010).
 
 **Sharpened differentiator:** Kami's `icp_segmentation` is **top-down** (3–5 segments reasoned
 from the seller's domain positioning); `signal_research` finds account signals (funding/hiring).
